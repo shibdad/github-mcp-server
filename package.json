@@ -1,0 +1,26 @@
+{
+  "name": "github-mcp-server",
+  "version": "1.0.0",
+  "description": "GitHub integration for Claude Desktop using Model Context Protocol",
+  "main": "index.js",
+  "bin": {
+    "github-mcp-server": "./index.js"
+  },
+  "scripts": {
+    "start": "./start.sh"
+  },
+  "keywords": [
+    "claude",
+    "mcp",
+    "github",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.7.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
