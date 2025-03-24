@@ -10,7 +10,9 @@ This MCP server connects Claude Desktop directly to your GitHub repos and git co
 - 📊 `git-status` - Check what's happening in your git repos
 - 📋 `github-list-repos` - Browse your GitHub repositories
 - 🔍 `github-repo-info` - Get detailed information about any repository
-- 🔎 `github-search-repos` - Search for repositories on GitHub
+- 📝 `git-commit` - Commit changes to your repositories
+- 🚀 `git-push` - Push your commits to GitHub
+- 🆕 `github-create-repo` - Create new GitHub repositories
 
 ## 🚀 Quick Start
 
@@ -62,7 +64,9 @@ Once connected, ask Claude things like:
 - "What's the git status of my project directory?"
 - "Show me a list of my GitHub repositories"
 - "Get details about the microsoft/vscode repository"
-- "Search for machine learning repositories on GitHub"
+- "Commit my changes with the message 'Update documentation'"
+- "Push my commits to GitHub"
+- "Create a new repository called 'my-awesome-project'"
 
 ## 🔧 Requirements
 

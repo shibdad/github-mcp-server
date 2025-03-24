@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * GitHub MCP Server
- * GitHub integration for Claude Desktop using Model Context Protocol
- */
-
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
@@ -14,30 +9,15 @@ const https = require('https');
 // Get GitHub token from environment variable
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 
-// If GitHub token is available, log that it's configured (to stderr, not stdout)
-if (GITHUB_TOKEN) {
-  console.error('GitHub token configured');
-} else {
-  console.error('No GitHub token provided. Some functionality may be limited.');
-}
+// Log token status to stderr for debugging
+console.error(`GitHub token ${GITHUB_TOKEN ? 'is configured' : 'is NOT configured'}`);
 
 /**
  * Execute a git command and return its output
  */
 function executeGitCommand(command) {
   try {
-    // Execute command with authentication if token is available
-    const output = execSync(command, { 
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        // Set GIT_ASKPASS to a non-existent command to prevent interactive password prompts
-        GIT_ASKPASS: 'echo',
-        // Disable credential helpers
-        GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_NOGLOBAL: '1'
-      }
-    });
+    const output = execSync(command, { encoding: 'utf8' });
     return { success: true, output };
   } catch (error) {
     return { success: false, error: error.message };
@@ -47,39 +27,67 @@ function executeGitCommand(command) {
 /**
  * Make a request to the GitHub API
  */
-async function githubApiRequest(endpoint) {
+function githubApiRequest(endpoint, method = 'GET', data = null) {
   return new Promise((resolve, reject) => {
+    console.error(`Making GitHub API request to: ${endpoint}`);
+    
     const options = {
       hostname: 'api.github.com',
       path: endpoint,
+      method: method,
       headers: {
         'User-Agent': 'GitHub-MCP-Server',
-        'Accept': 'application/vnd.github.v3+json',
-        ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {})
+        'Accept': 'application/vnd.github.v3+json'
       }
     };
+    
+    // Add token if available
+    if (GITHUB_TOKEN) {
+      options.headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+      console.error('Using GitHub token for authentication');
+    }
+    
+    // Add content headers if sending data
+    if (data) {
+      options.headers['Content-Type'] = 'application/json';
+      options.headers['Content-Length'] = Buffer.byteLength(JSON.stringify(data));
+    }
 
-    https.get(options, (res) => {
-      let data = '';
+    const req = https.request(options, (res) => {
+      let responseData = '';
       res.on('data', (chunk) => {
-        data += chunk;
+        responseData += chunk;
       });
+      
       res.on('end', () => {
-        if (res.statusCode !== 200) {
-          reject(new Error(`GitHub API returned ${res.statusCode}: ${data}`));
+        console.error(`API response status: ${res.statusCode}`);
+        
+        if (res.statusCode >= 400) {
+          console.error(`API error: ${responseData}`);
+          reject(new Error(`GitHub API returned ${res.statusCode}: ${responseData}`));
           return;
         }
         
         try {
-          const parsedData = JSON.parse(data);
+          const parsedData = responseData ? JSON.parse(responseData) : {};
           resolve(parsedData);
         } catch (e) {
-          reject(new Error(`Failed to parse GitHub API response: ${e.message}`));
+          console.error(`Error parsing response: ${e.message}`);
+          reject(new Error(`Failed to parse response: ${e.message}`));
         }
       });
-    }).on('error', (err) => {
-      reject(new Error(`GitHub API request failed: ${err.message}`));
     });
+    
+    req.on('error', (error) => {
+      console.error(`API request error: ${error.message}`);
+      reject(error);
+    });
+    
+    if (data) {
+      req.write(JSON.stringify(data));
+    }
+    
+    req.end();
   });
 }
 
@@ -95,19 +103,8 @@ async function main() {
     url: z.string().describe("URL of the repository to clone"),
     directory: z.string().optional().describe("Directory to clone into (optional)")
   }, async ({ url, directory }) => {
-    // Update URL with token if available for private repos
-    let cloneUrl = url;
-    if (GITHUB_TOKEN && url.includes('github.com')) {
-      const urlObj = new URL(url);
-      if (urlObj.protocol === 'https:') {
-        // Insert token into URL
-        urlObj.username = GITHUB_TOKEN;
-        cloneUrl = urlObj.toString();
-      }
-    }
-
     const dir = directory || '';
-    const command = `git clone ${cloneUrl} ${dir}`.trim();
+    const command = `git clone ${url} ${dir}`.trim();
     
     const result = executeGitCommand(command);
     
@@ -154,28 +151,146 @@ async function main() {
     }
   });
 
+  // Commit changes
+  server.tool("git-commit", {
+    message: z.string().describe("Commit message"),
+    directory: z.string().optional().describe("Directory to commit in (optional)"),
+    add_all: z.boolean().optional().describe("Add all changes before committing (optional)")
+  }, async ({ message, directory, add_all = true }) => {
+    const dir = directory || '.';
+    
+    let commands = [];
+    
+    // Change to the specified directory
+    commands.push(`cd ${dir}`);
+    
+    // Add changes if requested
+    if (add_all) {
+      commands.push('git add .');
+    }
+    
+    // Commit with message
+    commands.push(`git commit -m "${message.replace(/"/g, '\\"')}"`);
+    
+    const command = commands.join(' && ');
+    const result = executeGitCommand(command);
+    
+    if (result.success) {
+      return {
+        content: [{
+          type: "text",
+          text: `Successfully committed changes:\n${result.output}`
+        }]
+      };
+    } else {
+      return {
+        content: [{
+          type: "text",
+          text: `Failed to commit changes: ${result.error}`
+        }]
+      };
+    }
+  });
+
+  // Push changes
+  server.tool("git-push", {
+    directory: z.string().optional().describe("Directory to push from (optional)"),
+    remote: z.string().optional().describe("Remote to push to (optional)"),
+    branch: z.string().optional().describe("Branch to push (optional)")
+  }, async ({ directory, remote = 'origin', branch = 'main' }) => {
+    const dir = directory || '.';
+    const command = `cd ${dir} && git push ${remote} ${branch}`;
+    
+    const result = executeGitCommand(command);
+    
+    if (result.success) {
+      return {
+        content: [{
+          type: "text",
+          text: `Successfully pushed changes to ${remote}/${branch}:\n${result.output}`
+        }]
+      };
+    } else {
+      return {
+        content: [{
+          type: "text",
+          text: `Failed to push changes: ${result.error}`
+        }]
+      };
+    }
+  });
+
+  // Create GitHub repository
+  server.tool("github-create-repo", {
+    name: z.string().describe("Repository name"),
+    description: z.string().optional().describe("Repository description (optional)"),
+    private: z.boolean().optional().describe("Make repository private (optional)"),
+    auto_init: z.boolean().optional().describe("Auto-initialize with README (optional)")
+  }, async ({ name, description = '', private = false, auto_init = true }) => {
+    try {
+      if (!GITHUB_TOKEN) {
+        return {
+          content: [{
+            type: "text",
+            text: `GitHub token not configured. Please set the GITHUB_TOKEN environment variable.`
+          }]
+        };
+      }
+      
+      // Create repository using GitHub API
+      const payload = {
+        name: name,
+        description: description,
+        private: private,
+        auto_init: auto_init
+      };
+      
+      const repo = await githubApiRequest('/user/repos', 'POST', payload);
+      
+      return {
+        content: [{
+          type: "text",
+          text: `Successfully created repository "${repo.name}".\nURL: ${repo.html_url}`
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: "text",
+          text: `Failed to create repository: ${error.message}`
+        }]
+      };
+    }
+  });
+
   // List GitHub repositories
   server.tool("github-list-repos", {
     limit: z.number().optional().describe("Maximum number of repositories to return (optional)")
   }, async ({ limit = 10 }) => {
-    if (!GITHUB_TOKEN) {
-      return {
-        content: [{
-          type: "text",
-          text: `GitHub token not configured. Please set the GITHUB_TOKEN environment variable to access repositories.`
-        }]
-      };
-    }
+    console.error(`github-list-repos tool called with limit=${limit}`);
     
     try {
-      // Get user's repositories from GitHub API
+      // Check if token is available
+      if (!GITHUB_TOKEN) {
+        console.error('No GitHub token available');
+        return {
+          content: [{
+            type: "text",
+            text: `GitHub token not configured. Please set the GITHUB_TOKEN environment variable to access repositories.`
+          }]
+        };
+      }
+      
+      // Make API request
+      console.error('Making API request to list repos');
       const repos = await githubApiRequest('/user/repos?sort=updated&per_page=' + limit);
+      console.error(`Received ${repos?.length || 0} repositories from API`);
       
       if (!repos || repos.length === 0) {
         return {
           content: [{
             type: "text",
-            text: "No repositories found."
+            text: "No repositories found for your account."
           }]
         };
       }
@@ -192,6 +307,7 @@ async function main() {
         }]
       };
     } catch (error) {
+      console.error(`Error in github-list-repos: ${error.message}`);
       return {
         content: [{
           type: "text",
@@ -206,6 +322,15 @@ async function main() {
     repo: z.string().describe("Repository name with owner (e.g., owner/repo)")
   }, async ({ repo }) => {
     try {
+      if (!GITHUB_TOKEN) {
+        return {
+          content: [{
+            type: "text",
+            text: `GitHub token not configured. Please set the GITHUB_TOKEN environment variable.`
+          }]
+        };
+      }
+      
       // Get repository details from GitHub API
       const repoDetails = await githubApiRequest(`/repos/${repo}`);
       
@@ -235,45 +360,6 @@ async function main() {
         content: [{
           type: "text",
           text: `Failed to get repository details: ${error.message}`
-        }]
-      };
-    }
-  });
-
-  // Search GitHub repositories
-  server.tool("github-search-repos", {
-    query: z.string().describe("Search query"),
-    limit: z.number().optional().describe("Maximum number of repositories to return (optional)")
-  }, async ({ query, limit = 10 }) => {
-    try {
-      // Search repositories from GitHub API
-      const searchResults = await githubApiRequest(`/search/repositories?q=${encodeURIComponent(query)}&per_page=${limit}`);
-      
-      if (!searchResults.items || searchResults.items.length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: `No repositories found matching "${query}".`
-          }]
-        };
-      }
-      
-      // Format repos for display
-      const resultsList = searchResults.items.map((repo, i) => 
-        `${i + 1}. ${repo.full_name}: ${repo.description || 'No description'} (⭐ ${repo.stargazers_count})`
-      ).join('\n');
-      
-      return {
-        content: [{
-          type: "text",
-          text: `GitHub repositories matching "${query}":\n${resultsList}`
-        }]
-      };
-    } catch (error) {
-      return {
-        content: [{
-          type: "text",
-          text: `Failed to search repositories: ${error.message}`
         }]
       };
     }

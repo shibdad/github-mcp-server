@@ -9,17 +9,24 @@ cd "$(dirname "$0")"
 # Make scripts executable
 chmod +x index.js
 
-# If a GitHub token is provided via environment variable, use it
-# Otherwise, check for a token file
-if [ -z "$GITHUB_TOKEN" ]; then
-  if [ -f ".github_token" ]; then
-    export GITHUB_TOKEN=$(cat .github_token)
-    echo "Using GitHub token from .github_token file" >&2
-  else
-    echo "No GitHub token found. Some functionality will be limited." >&2
-    echo "To use GitHub API features, create a .github_token file or set the GITHUB_TOKEN environment variable." >&2
-  fi
+# Check for token in file first
+if [ -f ".github_token" ]; then
+  export GITHUB_TOKEN=$(cat .github_token)
+  echo "Using GitHub token from .github_token file" >&2
+elif [ -f "$HOME/.github_token" ]; then
+  export GITHUB_TOKEN=$(cat "$HOME/.github_token")
+  echo "Using GitHub token from ~/.github_token file" >&2
+else
+  echo "No GitHub token file found. Some functionality will be limited." >&2
+  echo "To use GitHub API features, create a .github_token file in this directory." >&2
 fi
 
-# Start the server using node
-exec node index.js
+# Verify the token is available
+if [ -n "$GITHUB_TOKEN" ]; then
+  echo "GitHub token is set" >&2
+else 
+  echo "GitHub token is NOT set" >&2
+fi
+
+# Start the server with node, ensuring proper error reporting
+node index.js
