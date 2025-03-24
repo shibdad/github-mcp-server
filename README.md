@@ -1,18 +1,20 @@
-# GitHub MCP Server
+# 🔗 GitHub MCP Server for Claude Desktop
 
-A GitHub integration for Claude Desktop using the Model Context Protocol (MCP).
+> Supercharge your Claude Desktop with seamless GitHub integration!
 
-## Features
+This MCP server connects Claude Desktop directly to your GitHub repos and git commands, letting you interact with your code and repositories through natural conversation.
 
-- `git-clone`: Clone a Git repository
-- `git-status`: Check the status of a Git repository
-- `github-list-repos`: List repositories (requires GitHub token)
+## ✨ Features
 
-## Installation
+- 🔄 `git-clone` - Clone any repository with a simple request
+- 📊 `git-status` - Check what's happening in your git repos
+- 📋 `github-list-repos` - Browse your GitHub repositories
 
-1. Clone this repository:
+## 🚀 Quick Start
+
+1. Clone this repo:
    ```bash
-   git clone https://github.com/your-username/github-mcp-server.git
+   git clone https://github.com/shibdad/github-mcp-server.git
    cd github-mcp-server
    ```
 
@@ -21,25 +23,23 @@ A GitHub integration for Claude Desktop using the Model Context Protocol (MCP).
    npm install
    ```
 
-3. Make the scripts executable:
+3. Make it executable:
    ```bash
    chmod +x start.sh index.js
    ```
 
-4. Configure your GitHub token (optional, but recommended):
+4. Add your GitHub token (for private repos and API access):
    ```bash
    echo "your-github-token" > .github_token
    ```
 
-   Alternatively, you can set the `GITHUB_TOKEN` environment variable.
+5. Hook it up to Claude Desktop:
 
-5. Configure Claude Desktop:
-
-   Open Claude Desktop's configuration file:
+   Edit Claude's config file:
    - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
    - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
-   Add the GitHub MCP server configuration:
+   Add this to your config:
    ```json
    {
      "mcpServers": {
@@ -51,33 +51,28 @@ A GitHub integration for Claude Desktop using the Model Context Protocol (MCP).
    }
    ```
 
-   Replace `/path/to/github-mcp-server` with the actual path to where you cloned the repository.
+6. Restart Claude and you're good to go!
 
-6. Restart Claude Desktop
+## 💬 Try These Prompts
 
-## Usage
+Once connected, ask Claude things like:
+- "Clone the tensorflow/models repository to my downloads folder"
+- "What's the git status of my project directory?"
+- "Show me a list of my GitHub repositories"
 
-1. In Claude Desktop, click on the hammer icon to see available tools
-2. Ask Claude to use the GitHub tools:
-   - "Clone the repository at https://github.com/example/repo"
-   - "Check the git status of my current directory"
-   - "List my GitHub repositories"
-
-## Requirements
+## 🔧 Requirements
 
 - Node.js 16+
 - Git command-line tools
 - Claude Desktop
 
-## Configuration
+## 🔒 GitHub Token Options
 
-### GitHub Token
+Need to access private repos? Add your token any of these ways:
 
-To access private repositories and use GitHub API features, you'll need a GitHub Personal Access Token. You can provide it in one of these ways:
-
-1. Create a `.github_token` file in the project directory with your token
+1. Create a `.github_token` file in the project folder
 2. Set the `GITHUB_TOKEN` environment variable
-3. Modify the Claude Desktop configuration to include the token:
+3. Add it directly in Claude's config:
    ```json
    {
      "mcpServers": {
@@ -92,6 +87,10 @@ To access private repositories and use GitHub API features, you'll need a GitHub
    }
    ```
 
-## License
+## 🙋‍♂️ Contributing
+
+Found a bug? Want to add a feature? PRs welcome!
+
+## 📜 License
 
 MIT
