@@ -9,6 +9,8 @@ This MCP server connects Claude Desktop directly to your GitHub repos and git co
 - 🔄 `git-clone` - Clone any repository with a simple request
 - 📊 `git-status` - Check what's happening in your git repos
 - 📋 `github-list-repos` - Browse your GitHub repositories
+- 🔍 `github-repo-info` - Get detailed information about any repository
+- 🔎 `github-search-repos` - Search for repositories on GitHub
 
 ## 🚀 Quick Start
 
@@ -59,12 +61,15 @@ Once connected, ask Claude things like:
 - "Clone the tensorflow/models repository to my downloads folder"
 - "What's the git status of my project directory?"
 - "Show me a list of my GitHub repositories"
+- "Get details about the microsoft/vscode repository"
+- "Search for machine learning repositories on GitHub"
 
 ## 🔧 Requirements
 
 - Node.js 16+
 - Git command-line tools
 - Claude Desktop
+- GitHub Personal Access Token (for API access)
 
 ## 🔒 GitHub Token Options
 
